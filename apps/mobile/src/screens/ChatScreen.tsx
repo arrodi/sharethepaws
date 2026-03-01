@@ -1,17 +1,28 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PetDatingProfile } from '../mock/profiles';
 import { theme } from '../theme';
 
-export function ChatScreen() {
+type Props = {
+  chats: PetDatingProfile[];
+};
+
+export function ChatScreen({ chats }: Props) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>Chat</Text>
-      <View style={styles.msgIn}><Text style={styles.msgText}>woof! want a park meetup this weekend?</Text></View>
-      <View style={styles.msgOut}><Text style={[styles.msgText, styles.msgOutText]}>meow yes! saturday morning works 🐾</Text></View>
-
-      <View style={styles.composer}>
-        <TextInput placeholder="Write as your pet..." style={styles.input} />
-        <Pressable style={styles.send}><Text style={styles.sendText}>Send</Text></Pressable>
-      </View>
+      <Text style={styles.title}>Chats</Text>
+      {chats.length === 0 ? <Text style={styles.empty}>No chats yet. Match from Discover to start one.</Text> : null}
+      <ScrollView contentContainerStyle={styles.list}>
+        {chats.map((c) => (
+          <Pressable key={c.id} style={styles.row}>
+            <View style={styles.avatarStub}><Text style={styles.avatarText}>{c.displayName.slice(0, 1)}</Text></View>
+            <View style={styles.center}>
+              <Text style={styles.name}>{c.displayName}</Text>
+              <Text style={styles.preview}>{c.prompts[0]?.answer ?? 'Say hi 👋'}</Text>
+            </View>
+            <Text style={styles.cta}>Open</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -19,12 +30,13 @@ export function ChatScreen() {
 const styles = StyleSheet.create({
   wrap: { flex: 1, gap: theme.spacing.sm },
   title: { fontSize: 20, fontWeight: '800', color: theme.colors.text },
-  msgIn: { alignSelf: 'flex-start', backgroundColor: theme.colors.panel, borderRadius: theme.radius.md, padding: 10, maxWidth: '82%' },
-  msgOut: { alignSelf: 'flex-end', backgroundColor: theme.colors.accent, borderRadius: theme.radius.md, padding: 10, maxWidth: '82%' },
-  msgText: { color: theme.colors.text },
-  msgOutText: { color: theme.colors.white },
-  composer: { marginTop: 'auto', flexDirection: 'row', gap: 8 },
-  input: { flex: 1, backgroundColor: theme.colors.white, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingHorizontal: 12, paddingVertical: 10 },
-  send: { backgroundColor: theme.colors.accentDark, borderRadius: theme.radius.md, paddingHorizontal: 14, justifyContent: 'center' },
-  sendText: { color: theme.colors.white, fontWeight: '700' },
+  empty: { color: theme.colors.textSubtle },
+  list: { gap: 8, paddingBottom: 18 },
+  row: { backgroundColor: theme.colors.panel, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatarStub: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#dcefe1', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontWeight: '800', color: theme.colors.text },
+  center: { flex: 1, gap: 2 },
+  name: { color: theme.colors.text, fontWeight: '700' },
+  preview: { color: theme.colors.textSubtle, fontSize: 12 },
+  cta: { color: theme.colors.accentDark, fontWeight: '800' },
 });

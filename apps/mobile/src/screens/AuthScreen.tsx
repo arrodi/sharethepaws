@@ -1,14 +1,18 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme';
 
-export function AuthScreen() {
+type Props = {
+  onContinue: () => void;
+};
+
+export function AuthScreen({ onContinue }: Props) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>Welcome to Share the Paws</Text>
-      <Text style={styles.subtitle}>Sign in as a human. Post as your pet.</Text>
+      <Text style={styles.subtitle}>Sign in as a human to match and chat for your pet.</Text>
       <TextInput placeholder="Email" style={styles.input} autoCapitalize="none" keyboardType="email-address" />
       <TextInput placeholder="Password" style={styles.input} secureTextEntry />
-      <Pressable style={styles.button}><Text style={styles.buttonText}>Continue</Text></Pressable>
+      <Pressable style={styles.button} onPress={onContinue}><Text style={styles.buttonText}>Continue</Text></Pressable>
     </View>
   );
 }

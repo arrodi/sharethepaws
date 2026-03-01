@@ -1,60 +1,77 @@
 import { useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { fakeProfiles } from '../mock/profiles';
+import { Image, PanResponder, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { fakeProfiles, PetDatingProfile } from '../mock/profiles';
 import { theme } from '../theme';
 
-export function DiscoverScreen() {
+type Props = {
+  onReject: (profile: PetDatingProfile) => void;
+  onConnect: (profile: PetDatingProfile) => void;
+};
+
+export function DiscoverScreen({ onReject, onConnect }: Props) {
   const [index, setIndex] = useState(0);
 
   const profile = useMemo(() => fakeProfiles[index % fakeProfiles.length], [index]);
-  const topPrompt = profile.prompts[0];
 
-  const next = () => setIndex((v) => v + 1);
+  const goNext = () => setIndex((v) => v + 1);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy),
+        onPanResponderRelease: (_, g) => {
+          if (g.dx > 50) {
+            onReject(profile);
+            goNext();
+          } else if (g.dx < -50) {
+            onConnect(profile);
+            goNext();
+          }
+        },
+      }),
+    [profile, onReject, onConnect]
+  );
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>Discover</Text>
-      <View style={styles.card}>
-        <Image source={{ uri: profile.photos[0] }} style={styles.photo} />
-        <Text style={styles.name}>
-          {profile.displayName} • {profile.species} • {profile.ageLabel}
-        </Text>
-        <Text style={styles.meta}>{profile.distanceKm.toFixed(1)} km away</Text>
-        <Text style={styles.bio}>{profile.bio}</Text>
+      <Text style={styles.hint}>Swipe right to pass • Swipe left to connect</Text>
 
-        <View style={styles.promptWrap}>
-          <Text style={styles.promptQ}>{topPrompt.question}</Text>
-          <Text style={styles.promptA}>{topPrompt.answer}</Text>
-        </View>
-      </View>
+      <View style={styles.card} {...panResponder.panHandlers}>
+        <ScrollView contentContainerStyle={styles.cardScroll} showsVerticalScrollIndicator={false}>
+          {profile.photos.map((p, i) => (
+            <Image key={`${profile.id}-photo-${i}`} source={{ uri: p }} style={styles.photo} />
+          ))}
 
-      <View style={styles.actions}>
-        <Pressable style={[styles.actionBtn, styles.passBtn]} onPress={next}>
-          <Text style={styles.passText}>Pass</Text>
-        </Pressable>
-        <Pressable style={[styles.actionBtn, styles.likeBtn]} onPress={next}>
-          <Text style={styles.likeText}>Like</Text>
-        </Pressable>
+          <Text style={styles.name}>
+            {profile.displayName} • {profile.species} • {profile.ageLabel}
+          </Text>
+          <Text style={styles.meta}>{profile.distanceKm.toFixed(1)} km away</Text>
+          <Text style={styles.bio}>{profile.bio}</Text>
+
+          {profile.prompts.map((pr, i) => (
+            <View key={`${profile.id}-prompt-${i}`} style={styles.promptWrap}>
+              <Text style={styles.promptQ}>{pr.question}</Text>
+              <Text style={styles.promptA}>{pr.answer}</Text>
+            </View>
+          ))}
+        </ScrollView>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: theme.spacing.md },
+  wrap: { flex: 1, gap: theme.spacing.md },
   title: { fontSize: 20, fontWeight: '800', color: theme.colors.text },
-  card: { backgroundColor: theme.colors.panel, borderRadius: theme.radius.lg, padding: 14, gap: 8, borderWidth: 1, borderColor: theme.colors.border },
+  hint: { color: theme.colors.textSubtle, fontSize: 12 },
+  card: { flex: 1, backgroundColor: theme.colors.panel, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
+  cardScroll: { padding: 14, gap: 8, paddingBottom: 24 },
   photo: { width: '100%', height: 220, borderRadius: 12, backgroundColor: '#dcefe1' },
-  name: { color: theme.colors.text, fontWeight: '800', fontSize: 18 },
+  name: { color: theme.colors.text, fontWeight: '800', fontSize: 18, marginTop: 2 },
   bio: { color: theme.colors.textSubtle },
   meta: { color: theme.colors.textSubtle, fontSize: 12 },
   promptWrap: { backgroundColor: '#f0faf2', borderRadius: 10, padding: 10, gap: 4 },
   promptQ: { color: theme.colors.text, fontWeight: '700' },
   promptA: { color: theme.colors.textSubtle },
-  actions: { flexDirection: 'row', gap: 10 },
-  actionBtn: { flex: 1, borderRadius: theme.radius.md, paddingVertical: 12, alignItems: 'center' },
-  passBtn: { backgroundColor: '#e7efe9' },
-  likeBtn: { backgroundColor: theme.colors.accent },
-  passText: { color: theme.colors.textSubtle, fontWeight: '700' },
-  likeText: { color: theme.colors.white, fontWeight: '700' },
 });
