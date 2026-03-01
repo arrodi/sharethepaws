@@ -1,9 +1,9 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { PetDatingProfile } from '../mock/profiles';
+import { ChatEntry } from '../api/client';
 import { theme } from '../theme';
 
 type Props = {
-  chats: PetDatingProfile[];
+  chats: ChatEntry[];
 };
 
 export function ChatScreen({ chats }: Props) {
@@ -13,11 +13,11 @@ export function ChatScreen({ chats }: Props) {
       {chats.length === 0 ? <Text style={styles.empty}>No chats yet. Match from Discover to start one.</Text> : null}
       <ScrollView contentContainerStyle={styles.list}>
         {chats.map((c) => (
-          <Pressable key={c.id} style={styles.row}>
+          <Pressable key={c.profileId} style={styles.row}>
             <View style={styles.avatarStub}><Text style={styles.avatarText}>{c.displayName.slice(0, 1)}</Text></View>
             <View style={styles.center}>
               <Text style={styles.name}>{c.displayName}</Text>
-              <Text style={styles.preview}>{c.prompts[0]?.answer ?? 'Say hi 👋'}</Text>
+              <Text style={styles.preview}>{c.promptPreview ?? 'Say hi 👋'}</Text>
             </View>
             <Text style={styles.cta}>Open</Text>
           </Pressable>

@@ -1,0 +1,7 @@
+export const seedProfiles = [
+  { id: 'pet-1', displayName: 'Luna', species: 'cat', ageLabel: '2y', bio: 'Professional nap strategist.', distanceKm: 2.1, photos: ['https://placecats.com/neo/600/600'], prompts: [{ question: 'My ideal playdate is…', answer: 'A sunny window and polite small talk.' }] },
+  { id: 'pet-2', displayName: 'Milo', species: 'dog', ageLabel: '3y', bio: 'Tail wagger, puddle jumper.', distanceKm: 1.8, photos: ['https://placedog.net/640/640?id=12'], prompts: [{ question: 'My perfect weekend is…', answer: 'Park zoomies then a peanut butter reward.' }] },
+  { id: 'pet-3', displayName: 'Poppy', species: 'dog', ageLabel: '4y', bio: 'Nose first, questions later.', distanceKm: 3.2, photos: ['https://placedog.net/640/640?id=21'], prompts: [{ question: 'I am known for…', answer: 'Finding snacks no one else can detect.' }] },
+  { id: 'pet-4', displayName: 'Oreo', species: 'rabbit', ageLabel: '1y', bio: 'Fast feet, softer heart.', distanceKm: 4.5, photos: ['https://loremflickr.com/640/640/rabbit?lock=4'], prompts: [{ question: 'Best first date activity…', answer: 'Parallel carrot munching.' }] },
+  { id: 'pet-5', displayName: 'Kiwi', species: 'bird', ageLabel: '2y', bio: 'Whistles, drama, and flawless feathers.', distanceKm: 5.7, photos: ['https://loremflickr.com/640/640/parrot?lock=5'], prompts: [{ question: 'I fall for…', answer: 'Good rhythm and respectful volume.' }] },
+];

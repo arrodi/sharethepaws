@@ -13,28 +13,37 @@ A pet-profile dating app (Hinge-style) for owners to discover compatible pets, m
   - Matches
   - Chat
 
-## Quick start
+## Quick start (local infra)
 
+### 1) Start local services
+- Postgres on `localhost:5432`
+- Redis on `localhost:6379`
+- MinIO on `localhost:9000` (API) and `localhost:9001` (console)
+
+### 2) Start API server
 ```bash
-cd apps/mobile
+cd apps/server
+cp .env.example .env
 npm install
 npm run start
 ```
 
-## Backend plan (Supabase)
-- Auth
-- Postgres + RLS
-- Storage (pet photos + message images)
-- Realtime (chat)
+### 3) Start mobile app
+```bash
+cd apps/mobile
+cp .env.example .env
+npm install
+npm run start
+```
 
-Run migrations in order:
-1. `supabase/migrations/0001_init.sql`
-2. `supabase/migrations/0002_rls.sql`
+### Environment variables
+- Server env: `apps/server/.env.example`
+- Mobile env: `apps/mobile/.env.example`
 
-## Next build tasks
-1. Wire auth/session + owner bootstrap
-2. Build real onboarding form + photo upload
-3. Implement discover candidate query and swipe API
-4. Implement mutual-like => match creation flow
-5. Build realtime chat thread screen
-6. Add report/block moderation and admin review tools
+## Backend notes
+This repo now includes a local API service wired to:
+- PostgreSQL (chat persistence)
+- Redis (session token state)
+- MinIO (bucket initialization for image storage)
+
+Supabase migration files remain in `supabase/migrations` for hosted path/reference.

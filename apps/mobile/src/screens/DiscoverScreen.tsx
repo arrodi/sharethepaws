@@ -1,19 +1,29 @@
 import { useMemo, useState } from 'react';
 import { Image, PanResponder, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { fakeProfiles, PetDatingProfile } from '../mock/profiles';
+import { PetDatingProfile } from '../mock/profiles';
 import { theme } from '../theme';
 
 type Props = {
-  onReject: (profile: PetDatingProfile) => void;
+  profiles: PetDatingProfile[];
+  onReject: (profile: PetDatingProfile) => boolean;
   onConnect: (profile: PetDatingProfile) => boolean;
 };
 
-export function DiscoverScreen({ onReject, onConnect }: Props) {
+export function DiscoverScreen({ profiles, onReject, onConnect }: Props) {
   const [index, setIndex] = useState(0);
 
-  const profile = useMemo(() => fakeProfiles[index % fakeProfiles.length], [index]);
+  const profile = useMemo(() => (profiles.length ? profiles[index % profiles.length] : null), [index, profiles]);
 
   const goNext = () => setIndex((v) => v + 1);
+
+  if (!profile) {
+    return (
+      <View style={styles.wrap}>
+        <Text style={styles.title}>Discover</Text>
+        <Text style={styles.hint}>No profiles available right now.</Text>
+      </View>
+    );
+  }
 
   const panResponder = useMemo(
     () =>

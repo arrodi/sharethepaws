@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { fetchChats, fetchDiscoverProfiles, mockLogin, swipe, type ChatEntry } from './src/api/client';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
@@ -14,12 +15,24 @@ type Tab = 'auth' | 'onboarding' | 'discover' | 'matches' | 'chat';
 export default function App() {
   const [tab, setTab] = useState<Tab>('discover');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [ownerId, setOwnerId] = useState('owner-demo');
   const [pendingConnect, setPendingConnect] = useState<PetDatingProfile | null>(null);
-  const [chats, setChats] = useState<PetDatingProfile[]>([]);
+  const [chats, setChats] = useState<ChatEntry[]>([]);
+  const [profiles, setProfiles] = useState<PetDatingProfile[]>([]);
   const [authWallOpen, setAuthWallOpen] = useState(false);
 
-  const openOrCreateChat = (profile: PetDatingProfile) => {
-    setChats((prev) => (prev.some((p) => p.id === profile.id) ? prev : [profile, ...prev]));
+  useEffect(() => {
+    fetchDiscoverProfiles().then(setProfiles).catch(() => setProfiles([]));
+  }, []);
+
+  const refreshChats = async (id: string) => {
+    const list = await fetchChats(id).catch(() => []);
+    setChats(list);
+  };
+
+  const openOrCreateChat = async (profile: PetDatingProfile) => {
+    await swipe(ownerId, profile.id, 'left').catch(() => null);
+    await refreshChats(ownerId);
     setTab('chat');
   };
 
@@ -38,11 +51,23 @@ export default function App() {
     return true;
   };
 
-  const handleAuthContinue = () => {
+  const handleRejectFromDiscover = (profile: PetDatingProfile) => {
+    if (!isLoggedIn) {
+      openAuthWall();
+      return false;
+    }
+    swipe(ownerId, profile.id, 'right').catch(() => null);
+    return true;
+  };
+
+  const handleAuthContinue = async () => {
+    const session = await mockLogin().catch(() => ({ ownerId: 'owner-demo' }));
+    setOwnerId(session.ownerId);
     setIsLoggedIn(true);
     setAuthWallOpen(false);
+    await refreshChats(session.ownerId);
     if (pendingConnect) {
-      openOrCreateChat(pendingConnect);
+      await openOrCreateChat(pendingConnect);
       setPendingConnect(null);
     } else {
       setTab('discover');
@@ -55,7 +80,7 @@ export default function App() {
       <View style={styles.content}>
         {tab === 'auth' ? <AuthScreen onContinue={handleAuthContinue} /> : null}
         {tab === 'onboarding' ? <OnboardingScreen /> : null}
-        {tab === 'discover' ? <DiscoverScreen onReject={() => {}} onConnect={handleConnectFromDiscover} /> : null}
+        {tab === 'discover' ? <DiscoverScreen profiles={profiles} onReject={handleRejectFromDiscover} onConnect={handleConnectFromDiscover} /> : null}
         {tab === 'matches' ? <MatchesScreen /> : null}
         {tab === 'chat' ? <ChatScreen chats={chats} /> : null}
       </View>
