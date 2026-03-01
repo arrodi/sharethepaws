@@ -1,0 +1,23 @@
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { theme } from '../theme';
+
+export function AuthScreen() {
+  return (
+    <View style={styles.wrap}>
+      <Text style={styles.title}>Welcome to Share the Paws</Text>
+      <Text style={styles.subtitle}>Sign in as a human. Post as your pet.</Text>
+      <TextInput placeholder="Email" style={styles.input} autoCapitalize="none" keyboardType="email-address" />
+      <TextInput placeholder="Password" style={styles.input} secureTextEntry />
+      <Pressable style={styles.button}><Text style={styles.buttonText}>Continue</Text></Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { gap: theme.spacing.sm },
+  title: { fontSize: 24, fontWeight: '800', color: theme.colors.text },
+  subtitle: { color: theme.colors.textSubtle, marginBottom: 8 },
+  input: { backgroundColor: theme.colors.white, borderColor: theme.colors.border, borderWidth: 1, borderRadius: theme.radius.md, padding: 12 },
+  button: { backgroundColor: theme.colors.accent, borderRadius: theme.radius.md, padding: 12, alignItems: 'center' },
+  buttonText: { color: theme.colors.white, fontWeight: '700' },
+});
