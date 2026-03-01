@@ -1,0 +1,9 @@
+mode: distributed
+statefulset:
+  replicaCount: 4
+persistence:
+  enabled: true
+  size: 20Gi
+defaultBuckets: pet-photos,chat-media
+service:
+  type: ClusterIP

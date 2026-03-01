@@ -1,0 +1,48 @@
+name: aks-selfhosted-teardown
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: Kubernetes namespace
+        required: true
+        default: sharethepaws
+
+env:
+  NAMESPACE: ${{ github.event.inputs.namespace }}
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Uninstall Helm releases
+        run: |
+          helm -n "$NAMESPACE" uninstall minio || true
+          helm -n "$NAMESPACE" uninstall redis || true
+          helm -n "$NAMESPACE" uninstall cnpg || true
+
+      - name: Delete postgres CR + secrets
+        run: |
+          kubectl -n "$NAMESPACE" delete -f infra/aks/postgres-cluster.yaml --ignore-not-found=true || true
+          kubectl -n "$NAMESPACE" delete secret sharethepaws-secrets --ignore-not-found=true || true
+
+      - name: Remaining resources
+        run: |
+          kubectl -n "$NAMESPACE" get all || true

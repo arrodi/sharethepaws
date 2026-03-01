@@ -1,0 +1,30 @@
+name: infra-validate
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aks-*.yml'
+      - 'infra/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra-validate.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify required infra files
+        run: |
+          test -f infra/aks/k8s-namespace.yaml
+          test -f infra/aks/values-redis.yaml
+          test -f infra/aks/values-minio.yaml
+          test -f infra/aks/cluster-secrets.template.env
+
+      - name: Lint YAML
+        run: |
+          pip install yamllint
+          yamllint -d '{extends: default, rules: {line-length: {max: 200}}}' infra/aks .github/workflows
