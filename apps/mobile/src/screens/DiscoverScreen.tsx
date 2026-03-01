@@ -67,11 +67,11 @@ const styles = StyleSheet.create({
   hint: { color: theme.colors.textSubtle, fontSize: 12 },
   card: { flex: 1, backgroundColor: theme.colors.panel, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
   cardScroll: { padding: 14, gap: 8, paddingBottom: 24 },
-  photo: { width: '100%', height: 220, borderRadius: 12, backgroundColor: '#dcefe1' },
+  photo: { width: '100%', height: 220, borderRadius: 12, backgroundColor: '#2a1a46' },
   name: { color: theme.colors.text, fontWeight: '800', fontSize: 18, marginTop: 2 },
   bio: { color: theme.colors.textSubtle },
   meta: { color: theme.colors.textSubtle, fontSize: 12 },
-  promptWrap: { backgroundColor: '#f0faf2', borderRadius: 10, padding: 10, gap: 4 },
+  promptWrap: { backgroundColor: '#24153f', borderRadius: 10, padding: 10, gap: 4 },
   promptQ: { color: theme.colors.text, fontWeight: '700' },
   promptA: { color: theme.colors.textSubtle },
 });

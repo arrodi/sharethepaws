@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
   empty: { color: theme.colors.textSubtle },
   list: { gap: 8, paddingBottom: 18 },
   row: { backgroundColor: theme.colors.panel, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarStub: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#dcefe1', alignItems: 'center', justifyContent: 'center' },
+  avatarStub: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#2a1a46', alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontWeight: '800', color: theme.colors.text },
   center: { flex: 1, gap: 2 },
   name: { color: theme.colors.text, fontWeight: '700' },

@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
   wrap: { gap: theme.spacing.sm },
   title: { fontSize: 20, fontWeight: '800', color: theme.colors.text },
   row: { backgroundColor: theme.colors.panel, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#dcefe1' },
+  avatar: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#2a1a46' },
   center: { flex: 1, gap: 2 },
   name: { color: theme.colors.text, fontWeight: '700' },
   meta: { color: theme.colors.textSubtle, fontSize: 12 },

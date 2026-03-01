@@ -48,7 +48,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <View style={styles.content}>
         {tab === 'auth' ? <AuthScreen onContinue={handleAuthContinue} /> : null}
         {tab === 'onboarding' ? <OnboardingScreen /> : null}
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   tab: { flex: 1, alignItems: 'center', gap: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#90c89e' },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4b2a86' },
   dotActive: { width: 18, backgroundColor: theme.colors.accent },
   tabLabel: { color: theme.colors.textSubtle, fontSize: 12 },
   tabLabelActive: { color: theme.colors.text, fontWeight: '800' },
