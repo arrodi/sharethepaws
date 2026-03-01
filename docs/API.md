@@ -1,64 +1,62 @@
-# Share the Paws — API Contracts (v1)
+# Share the Paws — API Contracts (Dating MVP)
 
-Backend target: Supabase (Postgres + Auth + Storage + Realtime)
+Backend target: Supabase (Auth + Postgres + Storage + Realtime)
 
 ## Auth
-- Supabase Auth email/password
-- Session JWT used for API and RLS
+- Supabase email/password auth
+- JWT-backed row-level security
 
-## Entities
-- owners (maps auth.user)
+## Domain Model
+- owners
 - pets
-- follows
-- posts
-- post_likes
-- dm_threads
-- dm_participants
-- dm_messages
+- pet_photos
+- pet_preferences
+- swipes
+- matches
+- match_participants
+- match_messages
+- blocks
 - reports
 
-## Endpoints / Functions (logical)
+## Logical Endpoints
 
-### Pets
-- `GET /pets/:id`
-- `PATCH /pets/:id` (owner only)
-- `POST /pets` (owner creates)
-- `GET /pets/:id/posts`
+### Owner / Pet Setup
+- `POST /pets` create pet profile
+- `PATCH /pets/:id` update pet profile
+- `GET /pets/:id` get profile
+- `POST /pets/:id/photos` add photo
+- `DELETE /pets/:id/photos/:photoId`
+- `PUT /pets/:id/preferences`
 
-### Follow
-- `POST /pets/:id/follow`
-- `DELETE /pets/:id/follow`
-- `GET /pets/:id/followers`
-- `GET /pets/:id/following`
+### Discovery
+- `GET /discover?pet_id=...&cursor=...`
+  - returns candidate cards excluding blocked/matched/already-swiped as configured
+- `POST /swipes`
+  - body: `{ actor_pet_id, target_pet_id, decision: "pass"|"like", comment? }`
+  - if mutual like, server creates match
 
-### Feed / Posts
-- `GET /feed?pet_id=...&cursor=...`
-- `POST /posts` body: `{ pet_id, image_path, caption }`
-- `DELETE /posts/:id` (owner of pet only)
-- `POST /posts/:id/like`
-- `DELETE /posts/:id/like`
+### Matches
+- `GET /matches?pet_id=...`
+- `DELETE /matches/:id` (unmatch)
 
-### DMs
-- `POST /dm/threads` body: `{ pet_a_id, pet_b_id }`
-- `GET /dm/threads?pet_id=...`
-- `GET /dm/threads/:id/messages?cursor=...`
-- `POST /dm/threads/:id/messages` body: `{ sender_pet_id, text, image_path? }`
+### Messaging
+- `GET /matches/:id/messages?cursor=...`
+- `POST /matches/:id/messages`
+  - body: `{ sender_pet_id, text, image_path? }`
 
-### Reports
-- `POST /reports` body: `{ reporter_pet_id, target_type, target_id, reason }`
+### Safety
+- `POST /blocks` body: `{ blocker_owner_id, blocked_owner_id }`
+- `DELETE /blocks/:id`
+- `POST /reports` body: `{ reporter_owner_id, target_type, target_id, reason, notes? }`
 
-## Validation Rules
-- Caption length <= 500
-- Message length <= 1500
-- Pet display name 2..32 chars
-- Species required
-
-## Realtime
-- Subscribe to `dm_messages` by thread id
-- Subscribe to likes/comments counters (optional v1.1)
+## Validation
+- pet bio <= 500 chars
+- message text <= 1500 chars
+- swipe comment <= 300 chars
+- photos: max 6 per pet
 
 ## Pagination
-- Cursor-based using `created_at` + `id`
+- Cursor-based with `(created_at, id)`
 
 ## Error Shape
 ```json
@@ -69,3 +67,7 @@ Backend target: Supabase (Postgres + Auth + Storage + Realtime)
   }
 }
 ```
+
+## Realtime
+- Subscribe to `match_messages` by match id
+- Optional unread count stream by pet_id (v1.1)

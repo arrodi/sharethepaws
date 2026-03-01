@@ -1,33 +1,33 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import { AuthScreen } from './src/screens/AuthScreen';
-import { FeedScreen } from './src/screens/FeedScreen';
-import { MessagesScreen } from './src/screens/MessagesScreen';
-import { ProfileScreen } from './src/screens/ProfileScreen';
+import { ChatScreen } from './src/screens/ChatScreen';
+import { DiscoverScreen } from './src/screens/DiscoverScreen';
+import { MatchesScreen } from './src/screens/MatchesScreen';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { theme } from './src/theme';
 
-type Tab = 'auth' | 'profile' | 'feed' | 'messages';
+type Tab = 'onboarding' | 'discover' | 'matches' | 'chat';
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('feed');
+  const [tab, setTab] = useState<Tab>('discover');
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <View style={styles.content}>
-        {tab === 'auth' ? <AuthScreen /> : null}
-        {tab === 'profile' ? <ProfileScreen /> : null}
-        {tab === 'feed' ? <FeedScreen /> : null}
-        {tab === 'messages' ? <MessagesScreen /> : null}
+        {tab === 'onboarding' ? <OnboardingScreen /> : null}
+        {tab === 'discover' ? <DiscoverScreen /> : null}
+        {tab === 'matches' ? <MatchesScreen /> : null}
+        {tab === 'chat' ? <ChatScreen /> : null}
       </View>
 
       <View style={styles.tabs}>
         {([
-          ['auth', 'Auth'],
-          ['profile', 'Pets'],
-          ['feed', 'Feed'],
-          ['messages', 'DMs'],
+          ['onboarding', 'Profile'],
+          ['discover', 'Discover'],
+          ['matches', 'Matches'],
+          ['chat', 'Chat'],
         ] as [Tab, string][]).map(([key, label]) => (
           <Pressable key={key} style={styles.tab} onPress={() => setTab(key)}>
             <View style={[styles.dot, tab === key && styles.dotActive]} />
