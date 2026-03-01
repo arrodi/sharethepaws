@@ -6,7 +6,9 @@ This folder contains baseline manifests/values for a self-hosted stack on AKS:
 - MinIO via Bitnami Helm chart
 
 ## Workflows
-- `.github/workflows/aks-selfhosted-deploy.yml`
+- `.github/workflows/aks-deploy-postgres.yml`
+- `.github/workflows/aks-deploy-redis.yml`
+- `.github/workflows/aks-deploy-minio.yml`
 - `.github/workflows/aks-selfhosted-teardown.yml`
 - `.github/workflows/infra-validate.yml`
 

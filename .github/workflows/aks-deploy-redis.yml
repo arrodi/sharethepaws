@@ -1,0 +1,60 @@
+name: aks-deploy-redis
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: Kubernetes namespace
+        required: true
+        default: sharethepaws
+
+env:
+  NAMESPACE: ${{ github.event.inputs.namespace }}
+
+jobs:
+  deploy-redis:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Ensure namespace
+        run: |
+          kubectl apply -f infra/aks/k8s-namespace.yaml
+          kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create redis secret material
+        run: |
+          kubectl -n "$NAMESPACE" create secret generic sharethepaws-secrets \
+            --from-literal=redis-password='${{ secrets.REDIS_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Add Bitnami repo
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update
+
+      - name: Deploy Redis
+        run: |
+          helm upgrade --install redis bitnami/redis \
+            --namespace "$NAMESPACE" \
+            -f infra/aks/values-redis.yaml \
+            --wait
+
+      - name: Verify Redis
+        run: |
+          kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/name=redis

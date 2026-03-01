@@ -1,0 +1,60 @@
+name: aks-deploy-postgres
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: Kubernetes namespace
+        required: true
+        default: sharethepaws
+
+env:
+  NAMESPACE: ${{ github.event.inputs.namespace }}
+
+jobs:
+  deploy-postgres:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Ensure namespace
+        run: |
+          kubectl apply -f infra/aks/k8s-namespace.yaml
+          kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create postgres secret material
+        run: |
+          kubectl -n "$NAMESPACE" create secret generic sharethepaws-secrets \
+            --from-literal=postgres-superuser-password='${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Add CNPG Helm repo
+        run: |
+          helm repo add cnpg https://cloudnative-pg.github.io/charts
+          helm repo update
+
+      - name: Deploy CloudNativePG operator
+        run: |
+          helm upgrade --install cnpg cnpg/cloudnative-pg \
+            --namespace "$NAMESPACE" \
+            --wait
+
+      - name: Deploy PostgreSQL cluster
+        run: |
+          kubectl apply -n "$NAMESPACE" -f infra/aks/postgres-cluster.yaml
+          kubectl -n "$NAMESPACE" get clusters.postgresql.cnpg.io
