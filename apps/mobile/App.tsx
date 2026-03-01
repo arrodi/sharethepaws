@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
@@ -16,28 +16,31 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [pendingConnect, setPendingConnect] = useState<PetDatingProfile | null>(null);
   const [chats, setChats] = useState<PetDatingProfile[]>([]);
+  const [authWallOpen, setAuthWallOpen] = useState(false);
 
   const openOrCreateChat = (profile: PetDatingProfile) => {
     setChats((prev) => (prev.some((p) => p.id === profile.id) ? prev : [profile, ...prev]));
     setTab('chat');
   };
 
+  const openAuthWall = (profile?: PetDatingProfile) => {
+    if (profile) setPendingConnect(profile);
+    setAuthWallOpen(true);
+  };
+
   const handleConnectFromDiscover = (profile: PetDatingProfile) => {
     if (!isLoggedIn) {
-      setPendingConnect(profile);
-      Alert.alert('Login required', 'To start a chat, login or create an account.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Login', onPress: () => setTab('auth') },
-        { text: 'Create account', onPress: () => setTab('auth') },
-      ]);
-      return;
+      openAuthWall(profile);
+      return false;
     }
 
     openOrCreateChat(profile);
+    return true;
   };
 
   const handleAuthContinue = () => {
     setIsLoggedIn(true);
+    setAuthWallOpen(false);
     if (pendingConnect) {
       openOrCreateChat(pendingConnect);
       setPendingConnect(null);
@@ -56,6 +59,24 @@ export default function App() {
         {tab === 'matches' ? <MatchesScreen /> : null}
         {tab === 'chat' ? <ChatScreen chats={chats} /> : null}
       </View>
+
+      {authWallOpen ? (
+        <View style={styles.authWallOverlay}>
+          <Pressable style={styles.authWallScrim} onPress={() => setAuthWallOpen(false)} />
+          <View style={styles.authWallCard}>
+            <Text style={styles.authWallTitle}>Login required</Text>
+            <Text style={styles.authWallText}>To start a chat, login or create an account.</Text>
+            <View style={styles.authWallActions}>
+              <Pressable style={styles.authWallSecondary} onPress={() => setAuthWallOpen(false)}>
+                <Text style={styles.authWallSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.authWallPrimary} onPress={() => { setAuthWallOpen(false); setTab('auth'); }}>
+                <Text style={styles.authWallPrimaryText}>Login / Create account</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.tabs}>
         {([
@@ -89,4 +110,14 @@ const styles = StyleSheet.create({
   dotActive: { width: 18, backgroundColor: theme.colors.accent },
   tabLabel: { color: theme.colors.textSubtle, fontSize: 12 },
   tabLabelActive: { color: theme.colors.text, fontWeight: '800' },
+  authWallOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 30 },
+  authWallScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  authWallCard: { width: '86%', backgroundColor: theme.colors.panel, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 14, padding: 16, gap: 10 },
+  authWallTitle: { color: theme.colors.text, fontSize: 20, fontWeight: '800' },
+  authWallText: { color: theme.colors.textSubtle },
+  authWallActions: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  authWallSecondary: { flex: 1, backgroundColor: '#2a1f42', borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  authWallSecondaryText: { color: theme.colors.textSubtle, fontWeight: '700' },
+  authWallPrimary: { flex: 1.4, backgroundColor: theme.colors.accent, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  authWallPrimaryText: { color: '#fff', fontWeight: '800' },
 });

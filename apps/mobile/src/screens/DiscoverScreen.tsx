@@ -5,7 +5,7 @@ import { theme } from '../theme';
 
 type Props = {
   onReject: (profile: PetDatingProfile) => void;
-  onConnect: (profile: PetDatingProfile) => void;
+  onConnect: (profile: PetDatingProfile) => boolean;
 };
 
 export function DiscoverScreen({ onReject, onConnect }: Props) {
@@ -24,8 +24,8 @@ export function DiscoverScreen({ onReject, onConnect }: Props) {
             onReject(profile);
             goNext();
           } else if (g.dx < -50) {
-            onConnect(profile);
-            goNext();
+            const moved = onConnect(profile);
+            if (moved) goNext();
           }
         },
       }),
