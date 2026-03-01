@@ -4,7 +4,7 @@ import { fakeProfiles, PetDatingProfile } from '../mock/profiles';
 import { theme } from '../theme';
 
 type Props = {
-  onReject: (profile: PetDatingProfile) => boolean;
+  onReject: (profile: PetDatingProfile) => void;
   onConnect: (profile: PetDatingProfile) => void;
 };
 
@@ -21,8 +21,8 @@ export function DiscoverScreen({ onReject, onConnect }: Props) {
         onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy),
         onPanResponderRelease: (_, g) => {
           if (g.dx > 50) {
-            const moved = onReject(profile);
-            if (moved) goNext();
+            onReject(profile);
+            goNext();
           } else if (g.dx < -50) {
             onConnect(profile);
             goNext();
