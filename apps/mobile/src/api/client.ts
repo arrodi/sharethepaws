@@ -2,7 +2,7 @@ import { PetDatingProfile } from '../mock/profiles';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
-type ChatEntry = {
+export type ChatEntry = {
   profileId: string;
   displayName: string;
   promptPreview: string;
@@ -53,5 +53,4 @@ export async function resetFakeProfiles() {
   return r.json() as Promise<{ ok: boolean }>;
 }
 
-export type { ChatEntry };
 export { API_BASE_URL };

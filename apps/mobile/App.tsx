@@ -58,11 +58,9 @@ export default function App() {
   };
 
   const handleRejectFromDiscover = (profile: PetDatingProfile) => {
-    if (!isLoggedIn) {
-      openAuthWall();
-      return false;
+    if (isLoggedIn) {
+      swipe(ownerId, profile.id, 'right').catch(() => null);
     }
-    swipe(ownerId, profile.id, 'right').catch(() => null);
     return true;
   };
 
@@ -109,7 +107,7 @@ export default function App() {
         {tab === 'auth' ? <AuthScreen onContinue={handleAuthContinue} /> : null}
         {tab === 'onboarding' ? <OnboardingScreen /> : null}
         {tab === 'discover' ? <DiscoverScreen profiles={profiles} onReject={handleRejectFromDiscover} onConnect={handleConnectFromDiscover} /> : null}
-        {tab === 'matches' ? <MatchesScreen /> : null}
+        {tab === 'matches' ? <MatchesScreen chats={chats} /> : null}
         {tab === 'chat' ? <ChatScreen chats={chats} /> : null}
         {tab === 'settings' ? <SettingsScreen onGenerateFakeProfiles={handleGenerateFakeProfiles} onResetFakeProfiles={handleResetFakeProfiles} /> : null}
       </View>
