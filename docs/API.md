@@ -1,73 +1,96 @@
-# Share the Paws — API Contracts (Dating MVP)
+# Share the Paws — Local API Contracts
 
-Backend target: Supabase (Auth + Postgres + Storage + Realtime)
+Base URL: `http://localhost:4000`
 
 ## Auth
-- Supabase email/password auth
-- JWT-backed row-level security
 
-## Domain Model
-- owners
-- pets
-- pet_photos
-- pet_preferences
-- swipes
-- matches
-- match_participants
-- match_messages
-- blocks
-- reports
+### `POST /auth/mock-login`
+Creates a local session and returns bearer token.
 
-## Logical Endpoints
+Body:
+```json
+{ "email": "demo@sharethepaws.local" }
+```
 
-### Owner / Pet Setup
-- `POST /pets` create pet profile
-- `PATCH /pets/:id` update pet profile
-- `GET /pets/:id` get profile
-- `POST /pets/:id/photos` add photo
-- `DELETE /pets/:id/photos/:photoId`
-- `PUT /pets/:id/preferences`
+Response:
+```json
+{ "token": "local-...", "ownerId": "owner-demo-sharethepaws-local" }
+```
 
-### Discovery
-- `GET /discover?pet_id=...&cursor=...`
-  - returns candidate cards excluding blocked/matched/already-swiped as configured
-- `POST /swipes`
-  - body: `{ actor_pet_id, target_pet_id, decision: "pass"|"like", comment? }`
-  - if mutual like, server creates match
+Use this token on protected routes:
+`Authorization: Bearer <token>`
 
-### Matches
-- `GET /matches?pet_id=...`
-- `DELETE /matches/:id` (unmatch)
+## Health
 
-### Messaging
-- `GET /matches/:id/messages?cursor=...`
-- `POST /matches/:id/messages`
-  - body: `{ sender_pet_id, text, image_path? }`
+### `GET /health`
+Checks Postgres + Redis reachability.
 
-### Safety
-- `POST /blocks` body: `{ blocker_owner_id, blocked_owner_id }`
-- `DELETE /blocks/:id`
-- `POST /reports` body: `{ reporter_owner_id, target_type, target_id, reason, notes? }`
+## Owner Profile
 
-## Validation
-- pet bio <= 500 chars
-- message text <= 1500 chars
-- swipe comment <= 300 chars
-- photos: max 6 per pet
+### `GET /me/profile` (auth)
+Returns current owner pet profile.
 
-## Pagination
-- Cursor-based with `(created_at, id)`
+### `POST /me/profile` (auth)
+Upserts owner pet profile.
 
-## Error Shape
+Body:
 ```json
 {
-  "error": {
-    "code": "string",
-    "message": "string"
-  }
+  "displayName": "Luna",
+  "species": "cat",
+  "breed": "Maine Coon",
+  "ageLabel": "3y",
+  "city": "Berlin",
+  "bio": "Window seat specialist",
+  "preferredSpecies": "dog",
+  "maxDistanceKm": 8
 }
 ```
 
-## Realtime
-- Subscribe to `match_messages` by match id
-- Optional unread count stream by pet_id (v1.1)
+## Discovery + Swipes
+
+### `GET /discover` (auth)
+Returns discover cards. If profile preferences exist, filters by:
+- `preferredSpecies`
+- `maxDistanceKm`
+
+### `POST /swipe` (auth)
+Body:
+```json
+{ "profileId": "pet-1", "direction": "left" }
+```
+- `left` creates/keeps a match (chat row)
+- `right` is pass only
+
+## Matches / Chats
+
+### `GET /chats` (auth)
+Returns match list with preview metadata:
+- `lastMessage`
+- `lastMessageAt`
+- `unreadCount`
+
+### `GET /chat/messages?profileId=pet-1` (auth)
+Returns message thread.
+
+### `POST /chat/messages` (auth)
+Body:
+```json
+{ "profileId": "pet-1", "text": "Hi!" }
+```
+Saves owner message and appends pet auto-reply.
+
+### `POST /chat/read` (auth)
+Body:
+```json
+{ "profileId": "pet-1" }
+```
+Marks pet messages as read.
+
+## Local Dev Admin Tools
+
+### `POST /admin/generate-fake-profiles` (auth)
+Generates seeded discover profiles in Postgres + uploads photos to MinIO.
+
+### `POST /admin/reset-fake-profiles` (auth)
+Clears generated discover/chat data and profile objects in MinIO.

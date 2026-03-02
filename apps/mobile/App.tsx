@@ -1,7 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import { fetchChats, fetchDiscoverProfiles, fetchOwnerProfile, generateFakeProfiles, mockLogin, resetFakeProfiles, saveOwnerProfile, swipe, type ChatEntry, type OwnerProfile } from './src/api/client';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { fetchChats, fetchDiscoverProfiles, fetchOwnerProfile, generateFakeProfiles, mockLogin, resetFakeProfiles, saveOwnerProfile, setAuthToken, swipe, type ChatEntry, type OwnerProfile } from './src/api/client';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
@@ -15,7 +16,6 @@ type Tab = 'auth' | 'onboarding' | 'discover' | 'chat' | 'settings';
 export default function App() {
   const [tab, setTab] = useState<Tab>('discover');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [ownerId, setOwnerId] = useState('owner-demo');
   const [pendingConnect, setPendingConnect] = useState<PetDatingProfile | null>(null);
   const [chats, setChats] = useState<ChatEntry[]>([]);
   const [profiles, setProfiles] = useState<PetDatingProfile[]>([]);
@@ -27,27 +27,26 @@ export default function App() {
     setProfiles(list);
   };
 
-  useEffect(() => {
-    refreshDiscover();
-  }, []);
+  const refreshChats = async () => {
+    const list = await fetchChats().catch(() => []);
+    setChats(list);
+  };
 
-  const refreshOwnerProfile = async (id: string) => {
-    const profile = await fetchOwnerProfile(id).catch(() => null);
+  const refreshOwnerProfile = async () => {
+    const profile = await fetchOwnerProfile().catch(() => null);
     setOwnerProfile(profile);
   };
 
   useEffect(() => {
-    refreshOwnerProfile(ownerId);
-  }, [ownerId]);
-
-  const refreshChats = async (id: string) => {
-    const list = await fetchChats(id).catch(() => []);
-    setChats(list);
-  };
+    if (!isLoggedIn) return;
+    refreshDiscover();
+    refreshChats();
+    refreshOwnerProfile();
+  }, [isLoggedIn]);
 
   const openOrCreateChat = async (profile: PetDatingProfile) => {
-    await swipe(ownerId, profile.id, 'left').catch(() => null);
-    await refreshChats(ownerId);
+    await swipe(profile.id, 'left').catch(() => null);
+    await refreshChats();
     setTab('chat');
   };
 
@@ -67,18 +66,25 @@ export default function App() {
   };
 
   const handleRejectFromDiscover = (profile: PetDatingProfile) => {
-    if (isLoggedIn) {
-      swipe(ownerId, profile.id, 'right').catch(() => null);
-    }
+    if (isLoggedIn) swipe(profile.id, 'right').catch(() => null);
     return true;
   };
 
-  const handleAuthContinue = async () => {
-    const session = await mockLogin().catch(() => ({ ownerId: 'owner-demo' }));
-    setOwnerId(session.ownerId);
+  const handleAuthContinue = async (email: string) => {
+    const session = await mockLogin(email).catch(() => null);
+    if (!session) {
+      Alert.alert('Login failed', 'Could not create session.');
+      return;
+    }
+
+    setAuthToken(session.token);
     setIsLoggedIn(true);
     setAuthWallOpen(false);
-    await refreshChats(session.ownerId);
+
+    await refreshChats();
+    await refreshDiscover();
+    await refreshOwnerProfile();
+
     if (pendingConnect) {
       await openOrCreateChat(pendingConnect);
       setPendingConnect(null);
@@ -111,9 +117,10 @@ export default function App() {
 
   const handleSaveOwnerProfile = async (profile: OwnerProfile) => {
     try {
-      const saved = await saveOwnerProfile(ownerId, profile);
+      const saved = await saveOwnerProfile(profile);
       setOwnerProfile(saved);
       Alert.alert('Saved', 'Profile updated.');
+      await refreshDiscover();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not save profile';
       Alert.alert('Error', message);
@@ -121,48 +128,50 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
-      <View style={styles.content}>
-        {tab === 'auth' ? <AuthScreen onContinue={handleAuthContinue} /> : null}
-        {tab === 'onboarding' ? <ProfileScreen profile={ownerProfile} onSave={handleSaveOwnerProfile} /> : null}
-        {tab === 'discover' ? <DiscoverScreen profiles={profiles} onReject={handleRejectFromDiscover} onConnect={handleConnectFromDiscover} /> : null}
-        {tab === 'chat' ? <ChatScreen chats={chats} ownerId={ownerId} /> : null}
-        {tab === 'settings' ? <SettingsScreen onGenerateFakeProfiles={handleGenerateFakeProfiles} onResetFakeProfiles={handleResetFakeProfiles} /> : null}
-      </View>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+        <View style={styles.content}>
+          {tab === 'auth' ? <AuthScreen onContinue={handleAuthContinue} /> : null}
+          {tab === 'onboarding' ? <ProfileScreen profile={ownerProfile} onSave={handleSaveOwnerProfile} /> : null}
+          {tab === 'discover' ? <DiscoverScreen profiles={profiles} onReject={handleRejectFromDiscover} onConnect={handleConnectFromDiscover} /> : null}
+          {tab === 'chat' ? <ChatScreen chats={chats} onRefreshChats={refreshChats} /> : null}
+          {tab === 'settings' ? <SettingsScreen onGenerateFakeProfiles={handleGenerateFakeProfiles} onResetFakeProfiles={handleResetFakeProfiles} /> : null}
+        </View>
 
-      {authWallOpen ? (
-        <View style={styles.authWallOverlay}>
-          <Pressable style={styles.authWallScrim} onPress={() => setAuthWallOpen(false)} />
-          <View style={styles.authWallCard}>
-            <Text style={styles.authWallTitle}>Login required</Text>
-            <Text style={styles.authWallText}>To start a chat, login or create an account.</Text>
-            <View style={styles.authWallActions}>
-              <Pressable style={styles.authWallSecondary} onPress={() => setAuthWallOpen(false)}>
-                <Text style={styles.authWallSecondaryText}>Cancel</Text>
-              </Pressable>
-              <Pressable style={styles.authWallPrimary} onPress={() => { setAuthWallOpen(false); setTab('auth'); }}>
-                <Text style={styles.authWallPrimaryText}>Login / Create account</Text>
-              </Pressable>
+        {authWallOpen ? (
+          <View style={styles.authWallOverlay}>
+            <Pressable style={styles.authWallScrim} onPress={() => setAuthWallOpen(false)} />
+            <View style={styles.authWallCard}>
+              <Text style={styles.authWallTitle}>Login required</Text>
+              <Text style={styles.authWallText}>To start a chat, login or create an account.</Text>
+              <View style={styles.authWallActions}>
+                <Pressable style={styles.authWallSecondary} onPress={() => setAuthWallOpen(false)}>
+                  <Text style={styles.authWallSecondaryText}>Cancel</Text>
+                </Pressable>
+                <Pressable style={styles.authWallPrimary} onPress={() => { setAuthWallOpen(false); setTab('auth'); }}>
+                  <Text style={styles.authWallPrimaryText}>Login / Create account</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      <View style={styles.tabs}>
-        {([
-          ['onboarding', 'Profile'],
-          ['discover', 'Discover'],
-          ['chat', 'Matches'],
-          ['settings', 'Settings'],
-        ] as [Exclude<Tab, 'auth'>, string][]).map(([key, label]) => (
-          <Pressable key={key} style={styles.tab} onPress={() => setTab(key)}>
-            <View style={[styles.dot, tab === key && styles.dotActive]} />
-            <Text style={[styles.tabLabel, tab === key && styles.tabLabelActive]}>{label}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </SafeAreaView>
+        <View style={styles.tabs}>
+          {([
+            ['onboarding', 'Profile'],
+            ['discover', 'Discover'],
+            ['chat', 'Matches'],
+            ['settings', 'Settings'],
+          ] as [Exclude<Tab, 'auth'>, string][]).map(([key, label]) => (
+            <Pressable key={key} style={styles.tab} onPress={() => setTab(key)}>
+              <View style={[styles.dot, tab === key && styles.dotActive]} />
+              <Text style={[styles.tabLabel, tab === key && styles.tabLabelActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

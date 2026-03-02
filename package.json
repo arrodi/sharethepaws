@@ -1,0 +1,11 @@
+{
+  "name": "sharethepaws-workspace",
+  "private": true,
+  "scripts": {
+    "dev:server": "cd apps/server && npm run start",
+    "dev:mobile": "cd apps/mobile && npm run start",
+    "dev:all": "bash scripts/dev-all.sh",
+    "dev:start": "bash scripts/dev-start.sh",
+    "smoke": "node tests/smoke.mjs"
+  }
+}

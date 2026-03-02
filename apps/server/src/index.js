@@ -4,6 +4,7 @@ import cors from 'cors';
 import { Pool } from 'pg';
 import { createClient as createRedisClient } from 'redis';
 import { Client as MinioClient } from 'minio';
+import crypto from 'node:crypto';
 import { seedProfiles } from './profiles.js';
 
 const app = express();
@@ -11,8 +12,6 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = Number(process.env.API_PORT || 4000);
-const OWNER_ID = 'owner-demo';
-
 const pg = new Pool({ connectionString: process.env.POSTGRES_URL || 'postgres://postgresadmin:super_secure_password_987@localhost:5432/sharethepaws-db' });
 const redis = createRedisClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
 
@@ -24,6 +23,21 @@ const minio = new MinioClient({
   secretKey: process.env.MINIO_SECRET_KEY || 'minioadmin',
 });
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'pet-photos';
+
+function getBearerToken(req) {
+  const auth = String(req.headers.authorization || '');
+  if (!auth.toLowerCase().startsWith('bearer ')) return null;
+  return auth.slice(7).trim();
+}
+
+async function requireAuth(req, res, next) {
+  const token = getBearerToken(req);
+  if (!token) return res.status(401).json({ error: 'missing_auth_token' });
+  const ownerId = await redis.get(`session:${token}`);
+  if (!ownerId) return res.status(401).json({ error: 'invalid_or_expired_session' });
+  req.ownerId = ownerId;
+  next();
+}
 
 async function ensureBucket() {
   try {
@@ -78,7 +92,8 @@ async function init() {
       profile_id TEXT NOT NULL,
       sender TEXT NOT NULL,
       text TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      read_at TIMESTAMPTZ
     );
   `);
 
@@ -117,16 +132,11 @@ async function clearProfileObjectsFromMinio() {
     const objects = [];
     const stream = minio.listObjectsV2(MINIO_BUCKET, 'profiles/', true);
     await new Promise((resolve, reject) => {
-      stream.on('data', (obj) => {
-        if (obj?.name) objects.push(obj.name);
-      });
+      stream.on('data', (obj) => { if (obj?.name) objects.push(obj.name); });
       stream.on('error', reject);
       stream.on('end', resolve);
     });
-
-    if (objects.length > 0) {
-      await minio.removeObjects(MINIO_BUCKET, objects);
-    }
+    if (objects.length > 0) await minio.removeObjects(MINIO_BUCKET, objects);
   } catch {
     // non-fatal for local dev
   }
@@ -136,7 +146,6 @@ async function clearGeneratedData() {
   await clearProfileObjectsFromMinio();
   await pg.query('DELETE FROM chat_messages;');
   await pg.query('DELETE FROM chats;');
-  await pg.query('DELETE FROM owner_profiles;');
   await pg.query('DELETE FROM fake_accounts;');
   await pg.query('DELETE FROM discover_profiles;');
 }
@@ -173,42 +182,57 @@ async function generateProfilesIntoStorageAndDb() {
   }
 }
 
-async function getDiscoverProfilesFromDb() {
+async function getOwnerProfile(ownerId) {
+  const { rows } = await pg.query(
+    `SELECT display_name as "displayName", species, breed, age_label as "ageLabel", city, bio,
+            preferred_species as "preferredSpecies", max_distance_km as "maxDistanceKm"
+     FROM owner_profiles WHERE owner_id = $1 LIMIT 1`,
+    [ownerId]
+  );
+  return rows[0] ?? null;
+}
+
+async function getDiscoverProfilesFromDb(ownerId) {
+  const ownerProfile = ownerId ? await getOwnerProfile(ownerId) : null;
+  const values = [];
+  const clauses = [];
+
+  if (ownerProfile?.preferredSpecies) {
+    values.push(ownerProfile.preferredSpecies);
+    clauses.push(`species = $${values.length}`);
+  }
+  if (typeof ownerProfile?.maxDistanceKm === 'number' && ownerProfile.maxDistanceKm > 0) {
+    values.push(ownerProfile.maxDistanceKm);
+    clauses.push(`distance_km <= $${values.length}`);
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const { rows } = await pg.query(
     `SELECT id, display_name, species, age_label, bio, distance_km, photos, prompts
-     FROM discover_profiles
-     ORDER BY created_at DESC`
+     FROM discover_profiles ${where}
+     ORDER BY created_at DESC`,
+    values
   );
 
-  const profiles = await Promise.all(
-    rows.map(async (r) => {
-      const photoValues = Array.isArray(r.photos) ? r.photos : [];
-      const photos = await Promise.all(
-        photoValues.map(async (entry) => {
-          if (typeof entry !== 'string') return '';
-          if (entry.startsWith('http://') || entry.startsWith('https://')) return entry;
-          try {
-            return await minio.presignedGetObject(MINIO_BUCKET, entry, 60 * 60 * 24);
-          } catch {
-            return entry;
-          }
-        })
-      );
+  return Promise.all(rows.map(async (r) => {
+    const photoValues = Array.isArray(r.photos) ? r.photos : [];
+    const photos = await Promise.all(photoValues.map(async (entry) => {
+      if (typeof entry !== 'string') return '';
+      if (entry.startsWith('http://') || entry.startsWith('https://')) return entry;
+      try { return await minio.presignedGetObject(MINIO_BUCKET, entry, 60 * 60 * 24); } catch { return entry; }
+    }));
 
-      return {
-        id: r.id,
-        displayName: r.display_name,
-        species: r.species,
-        ageLabel: r.age_label,
-        bio: r.bio,
-        distanceKm: Number(r.distance_km),
-        photos,
-        prompts: Array.isArray(r.prompts) ? r.prompts : [],
-      };
-    })
-  );
-
-  return profiles;
+    return {
+      id: r.id,
+      displayName: r.display_name,
+      species: r.species,
+      ageLabel: r.age_label,
+      bio: r.bio,
+      distanceKm: Number(r.distance_km),
+      photos,
+      prompts: Array.isArray(r.prompts) ? r.prompts : [],
+    };
+  }));
 }
 
 app.get('/health', async (_req, res) => {
@@ -221,38 +245,21 @@ app.get('/health', async (_req, res) => {
   }
 });
 
-app.post('/auth/mock-login', async (_req, res) => {
-  const token = `local-${Date.now()}`;
-  await redis.set(`session:${token}`, OWNER_ID, { EX: 60 * 60 * 24 * 7 });
-  res.json({ token, ownerId: OWNER_ID });
+app.post('/auth/mock-login', async (req, res) => {
+  const email = String(req.body?.email || 'demo@sharethepaws.local').toLowerCase().trim();
+  const safe = email.replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+  const ownerId = `owner-${safe || crypto.randomUUID()}`;
+  const token = `local-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
+  await redis.set(`session:${token}`, ownerId, { EX: 60 * 60 * 24 * 7 });
+  res.json({ token, ownerId });
 });
 
-app.get('/me/profile', async (req, res) => {
-  const ownerId = String(req.query.ownerId || OWNER_ID);
-  const { rows } = await pg.query(
-    `SELECT display_name as "displayName", species, breed, age_label as "ageLabel", city, bio,
-            preferred_species as "preferredSpecies", max_distance_km as "maxDistanceKm"
-     FROM owner_profiles
-     WHERE owner_id = $1
-     LIMIT 1`,
-    [ownerId]
-  );
-  res.json({ profile: rows[0] ?? null });
+app.get('/me/profile', requireAuth, async (req, res) => {
+  res.json({ profile: await getOwnerProfile(req.ownerId) });
 });
 
-app.post('/me/profile', async (req, res) => {
-  const {
-    ownerId = OWNER_ID,
-    displayName,
-    species,
-    breed = null,
-    ageLabel = null,
-    city = null,
-    bio = null,
-    preferredSpecies = null,
-    maxDistanceKm = null,
-  } = req.body || {};
-
+app.post('/me/profile', requireAuth, async (req, res) => {
+  const { displayName, species, breed = null, ageLabel = null, city = null, bio = null, preferredSpecies = null, maxDistanceKm = null } = req.body || {};
   if (!String(displayName || '').trim() || !String(species || '').trim()) {
     return res.status(400).json({ error: 'display_name_and_species_required' });
   }
@@ -261,59 +268,37 @@ app.post('/me/profile', async (req, res) => {
     `INSERT INTO owner_profiles (owner_id, display_name, species, breed, age_label, city, bio, preferred_species, max_distance_km, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
      ON CONFLICT (owner_id) DO UPDATE
-     SET display_name = EXCLUDED.display_name,
-         species = EXCLUDED.species,
-         breed = EXCLUDED.breed,
-         age_label = EXCLUDED.age_label,
-         city = EXCLUDED.city,
-         bio = EXCLUDED.bio,
-         preferred_species = EXCLUDED.preferred_species,
-         max_distance_km = EXCLUDED.max_distance_km,
-         updated_at = NOW()`,
-    [ownerId, String(displayName).trim(), String(species).trim(), breed, ageLabel, city, bio, preferredSpecies, maxDistanceKm]
+     SET display_name = EXCLUDED.display_name, species = EXCLUDED.species, breed = EXCLUDED.breed,
+         age_label = EXCLUDED.age_label, city = EXCLUDED.city, bio = EXCLUDED.bio,
+         preferred_species = EXCLUDED.preferred_species, max_distance_km = EXCLUDED.max_distance_km, updated_at = NOW()`,
+    [req.ownerId, String(displayName).trim(), String(species).trim(), breed, ageLabel, city, bio, preferredSpecies, maxDistanceKm]
   );
 
-  const { rows } = await pg.query(
-    `SELECT display_name as "displayName", species, breed, age_label as "ageLabel", city, bio,
-            preferred_species as "preferredSpecies", max_distance_km as "maxDistanceKm"
-     FROM owner_profiles
-     WHERE owner_id = $1
-     LIMIT 1`,
-    [ownerId]
-  );
-  res.json({ profile: rows[0] ?? null });
+  res.json({ profile: await getOwnerProfile(req.ownerId) });
 });
 
-app.post('/admin/generate-fake-profiles', async (_req, res) => {
-  try {
-    await generateProfilesIntoStorageAndDb();
-    res.json({ ok: true, generated: seedProfiles.length });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+app.post('/admin/generate-fake-profiles', requireAuth, async (_req, res) => {
+  try { await generateProfilesIntoStorageAndDb(); res.json({ ok: true, generated: seedProfiles.length }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
-app.post('/admin/reset-fake-profiles', async (_req, res) => {
-  try {
-    await clearGeneratedData();
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+app.post('/admin/reset-fake-profiles', requireAuth, async (_req, res) => {
+  try { await clearGeneratedData(); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
-app.get('/discover', async (_req, res) => {
+app.get('/discover', requireAuth, async (req, res) => {
   try {
-    const profiles = await getDiscoverProfilesFromDb();
+    const profiles = await getDiscoverProfilesFromDb(req.ownerId);
     res.json({ profiles });
   } catch {
     res.json({ profiles: seedProfiles });
   }
 });
 
-app.post('/swipe', async (req, res) => {
-  const { ownerId = OWNER_ID, profileId, direction } = req.body || {};
-  const profiles = await getDiscoverProfilesFromDb().catch(() => seedProfiles);
+app.post('/swipe', requireAuth, async (req, res) => {
+  const { profileId, direction } = req.body || {};
+  const profiles = await getDiscoverProfilesFromDb(req.ownerId).catch(() => seedProfiles);
   const profile = profiles.find((p) => p.id === profileId);
   if (!profile) return res.status(404).json({ error: 'profile_not_found' });
 
@@ -322,79 +307,84 @@ app.post('/swipe', async (req, res) => {
       `INSERT INTO chats (owner_id, profile_id, display_name, prompt_preview)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (owner_id, profile_id) DO NOTHING`,
-      [ownerId, profile.id, profile.displayName, profile.prompts[0]?.answer ?? 'Say hi 👋']
+      [req.ownerId, profile.id, profile.displayName, profile.prompts[0]?.answer ?? 'Say hi 👋']
     );
     return res.json({ matched: true });
   }
-
   res.json({ matched: false });
 });
 
-app.get('/chats', async (req, res) => {
-  const ownerId = String(req.query.ownerId || OWNER_ID);
+app.get('/chats', requireAuth, async (req, res) => {
   const { rows } = await pg.query(
-    'SELECT profile_id as "profileId", display_name as "displayName", prompt_preview as "promptPreview" FROM chats WHERE owner_id = $1 ORDER BY created_at DESC',
-    [ownerId]
+    `SELECT c.profile_id as "profileId", c.display_name as "displayName", c.prompt_preview as "promptPreview",
+            lm.text as "lastMessage", lm.created_at as "lastMessageAt",
+            COALESCE(unread.count, 0)::int as "unreadCount"
+     FROM chats c
+     LEFT JOIN LATERAL (
+       SELECT text, created_at FROM chat_messages m
+       WHERE m.owner_id = c.owner_id AND m.profile_id = c.profile_id
+       ORDER BY created_at DESC LIMIT 1
+     ) lm ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*) as count FROM chat_messages m
+       WHERE m.owner_id = c.owner_id AND m.profile_id = c.profile_id AND m.sender = 'pet' AND m.read_at IS NULL
+     ) unread ON TRUE
+     WHERE c.owner_id = $1
+     ORDER BY COALESCE(lm.created_at, c.created_at) DESC`,
+    [req.ownerId]
   );
   res.json({ chats: rows });
 });
 
-app.get('/chat/messages', async (req, res) => {
-  const ownerId = String(req.query.ownerId || OWNER_ID);
+app.get('/chat/messages', requireAuth, async (req, res) => {
   const profileId = String(req.query.profileId || '');
   if (!profileId) return res.status(400).json({ error: 'profile_id_required' });
-
   const { rows } = await pg.query(
     `SELECT id::text, sender, text, created_at as "createdAt"
-     FROM chat_messages
-     WHERE owner_id = $1 AND profile_id = $2
-     ORDER BY created_at ASC`,
-    [ownerId, profileId]
+     FROM chat_messages WHERE owner_id = $1 AND profile_id = $2 ORDER BY created_at ASC`,
+    [req.ownerId, profileId]
   );
-
   res.json({ messages: rows });
 });
 
-app.post('/chat/messages', async (req, res) => {
-  const { ownerId = OWNER_ID, profileId, text } = req.body || {};
+app.post('/chat/read', requireAuth, async (req, res) => {
+  const profileId = String(req.body?.profileId || '');
+  if (!profileId) return res.status(400).json({ error: 'profile_id_required' });
+  await pg.query(
+    `UPDATE chat_messages SET read_at = NOW()
+     WHERE owner_id = $1 AND profile_id = $2 AND sender = 'pet' AND read_at IS NULL`,
+    [req.ownerId, profileId]
+  );
+  res.json({ ok: true });
+});
+
+app.post('/chat/messages', requireAuth, async (req, res) => {
+  const { profileId, text } = req.body || {};
   const msgText = String(text || '').trim();
   if (!profileId || !msgText) return res.status(400).json({ error: 'profile_id_and_text_required' });
 
-  const chatRow = await pg.query('SELECT display_name as "displayName" FROM chats WHERE owner_id = $1 AND profile_id = $2 LIMIT 1', [ownerId, profileId]);
+  const chatRow = await pg.query('SELECT display_name as "displayName" FROM chats WHERE owner_id = $1 AND profile_id = $2 LIMIT 1', [req.ownerId, profileId]);
   if (!chatRow.rowCount) return res.status(404).json({ error: 'chat_not_found' });
 
-  const insertUser = await pg.query(
-    `INSERT INTO chat_messages (owner_id, profile_id, sender, text)
-     VALUES ($1,$2,'owner',$3)
-     RETURNING id::text, sender, text, created_at as "createdAt"`,
-    [ownerId, profileId, msgText]
+  await pg.query(
+    `INSERT INTO chat_messages (owner_id, profile_id, sender, text, read_at) VALUES ($1,$2,'owner',$3,NOW())`,
+    [req.ownerId, profileId, msgText]
   );
 
   const replyText = `🐾 ${chatRow.rows[0].displayName}: ${msgText.slice(0, 120)}`;
   await pg.query(
-    `INSERT INTO chat_messages (owner_id, profile_id, sender, text)
-     VALUES ($1,$2,'pet',$3)`,
-    [ownerId, profileId, replyText]
+    `INSERT INTO chat_messages (owner_id, profile_id, sender, text) VALUES ($1,$2,'pet',$3)`,
+    [req.ownerId, profileId, replyText]
   );
 
   const { rows } = await pg.query(
     `SELECT id::text, sender, text, created_at as "createdAt"
-     FROM chat_messages
-     WHERE owner_id = $1 AND profile_id = $2
-     ORDER BY created_at ASC`,
-    [ownerId, profileId]
+     FROM chat_messages WHERE owner_id = $1 AND profile_id = $2 ORDER BY created_at ASC`,
+    [req.ownerId, profileId]
   );
-
-  res.json({ sent: insertUser.rows[0], messages: rows });
+  res.json({ messages: rows });
 });
 
 init()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`sharethepaws-server listening on :${PORT}`);
-    });
-  })
-  .catch((e) => {
-    console.error('Failed to start server', e);
-    process.exit(1);
-  });
+  .then(() => app.listen(PORT, () => console.log(`sharethepaws-server listening on :${PORT}`)))
+  .catch((e) => { console.error('Failed to start server', e); process.exit(1); });

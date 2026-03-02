@@ -7,43 +7,38 @@ A pet-profile dating app (Hinge-style) for owners to discover compatible pets, m
 - `SPEC.md` — dating-model MVP product spec
 - `docs/API.md` — backend API contracts for discovery/swipes/matches/chats
 - `supabase/migrations` — DB schema + RLS policies
-- `apps/mobile` — Expo TypeScript mobile scaffold with core screens:
-  - Onboarding/Profile setup
-  - Discover (swipe-style)
-  - Matches
-  - Chat
+- `apps/mobile` — Expo app
+- `apps/server` — local API (Postgres + Redis + MinIO)
+- `docker-compose.yml` — local infra (Postgres/Redis/MinIO)
 
-## Quick start (local infra)
+## Quick start (recommended)
 
-### 1) Start local services
-- Postgres on `localhost:5432`
-- Redis on `localhost:6379`
-- MinIO on `localhost:9000` (API) and `localhost:9001` (console)
-
-### 2) Start API server
 ```bash
-cd apps/server
-cp .env.example .env
-npm install
-npm run start
+docker compose up -d
+npm run dev:start
 ```
 
-### 3) Start mobile app
+Then start mobile in a second terminal:
+
 ```bash
-cd apps/mobile
-cp .env.example .env
-npm install
-npm run start
+npm run dev:mobile
 ```
 
-### Environment variables
+## Environment variables
+
 - Server env: `apps/server/.env.example`
 - Mobile env: `apps/mobile/.env.example`
 
-## Backend notes
-This repo now includes a local API service wired to:
-- PostgreSQL (chat persistence)
-- Redis (session token state)
-- MinIO (bucket initialization for image storage)
+## Scripts
 
-Supabase migration files remain in `supabase/migrations` for hosted path/reference.
+- `npm run dev:server` — start API server
+- `npm run dev:mobile` — start Expo app
+- `npm run dev:all` — start both
+- `npm run dev:start` — boot + health-check API
+- `npm run smoke` — end-to-end smoke test (profile → discover → swipe → chat)
+
+## Notes
+
+- API endpoints requiring auth now use `Authorization: Bearer <token>` from `/auth/mock-login`.
+- Discover is filtered by owner profile preferences (`preferredSpecies`, `maxDistanceKm`) when set.
+- Matches/chat list now returns `lastMessage`, `lastMessageAt`, and `unreadCount`.
