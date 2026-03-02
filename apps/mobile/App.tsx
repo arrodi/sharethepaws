@@ -108,7 +108,7 @@ export default function App() {
         {tab === 'onboarding' ? <OnboardingScreen /> : null}
         {tab === 'discover' ? <DiscoverScreen profiles={profiles} onReject={handleRejectFromDiscover} onConnect={handleConnectFromDiscover} /> : null}
         {tab === 'matches' ? <MatchesScreen chats={chats} /> : null}
-        {tab === 'chat' ? <ChatScreen chats={chats} /> : null}
+        {tab === 'chat' ? <ChatScreen chats={chats} ownerId={ownerId} /> : null}
         {tab === 'settings' ? <SettingsScreen onGenerateFakeProfiles={handleGenerateFakeProfiles} onResetFakeProfiles={handleResetFakeProfiles} /> : null}
       </View>
 

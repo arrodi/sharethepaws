@@ -71,6 +71,17 @@ async function init() {
     );
   `);
 
+  await pg.query(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id SERIAL PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      profile_id TEXT NOT NULL,
+      sender TEXT NOT NULL,
+      text TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
   await ensureBucket();
 }
 
@@ -108,6 +119,7 @@ async function clearProfileObjectsFromMinio() {
 
 async function clearGeneratedData() {
   await clearProfileObjectsFromMinio();
+  await pg.query('DELETE FROM chat_messages;');
   await pg.query('DELETE FROM chats;');
   await pg.query('DELETE FROM fake_accounts;');
   await pg.query('DELETE FROM discover_profiles;');
@@ -252,6 +264,55 @@ app.get('/chats', async (req, res) => {
     [ownerId]
   );
   res.json({ chats: rows });
+});
+
+app.get('/chat/messages', async (req, res) => {
+  const ownerId = String(req.query.ownerId || OWNER_ID);
+  const profileId = String(req.query.profileId || '');
+  if (!profileId) return res.status(400).json({ error: 'profile_id_required' });
+
+  const { rows } = await pg.query(
+    `SELECT id::text, sender, text, created_at as "createdAt"
+     FROM chat_messages
+     WHERE owner_id = $1 AND profile_id = $2
+     ORDER BY created_at ASC`,
+    [ownerId, profileId]
+  );
+
+  res.json({ messages: rows });
+});
+
+app.post('/chat/messages', async (req, res) => {
+  const { ownerId = OWNER_ID, profileId, text } = req.body || {};
+  const msgText = String(text || '').trim();
+  if (!profileId || !msgText) return res.status(400).json({ error: 'profile_id_and_text_required' });
+
+  const chatRow = await pg.query('SELECT display_name as "displayName" FROM chats WHERE owner_id = $1 AND profile_id = $2 LIMIT 1', [ownerId, profileId]);
+  if (!chatRow.rowCount) return res.status(404).json({ error: 'chat_not_found' });
+
+  const insertUser = await pg.query(
+    `INSERT INTO chat_messages (owner_id, profile_id, sender, text)
+     VALUES ($1,$2,'owner',$3)
+     RETURNING id::text, sender, text, created_at as "createdAt"`,
+    [ownerId, profileId, msgText]
+  );
+
+  const replyText = `🐾 ${chatRow.rows[0].displayName}: ${msgText.slice(0, 120)}`;
+  await pg.query(
+    `INSERT INTO chat_messages (owner_id, profile_id, sender, text)
+     VALUES ($1,$2,'pet',$3)`,
+    [ownerId, profileId, replyText]
+  );
+
+  const { rows } = await pg.query(
+    `SELECT id::text, sender, text, created_at as "createdAt"
+     FROM chat_messages
+     WHERE owner_id = $1 AND profile_id = $2
+     ORDER BY created_at ASC`,
+    [ownerId, profileId]
+  );
+
+  res.json({ sent: insertUser.rows[0], messages: rows });
 });
 
 init()

@@ -53,4 +53,29 @@ export async function resetFakeProfiles() {
   return r.json() as Promise<{ ok: boolean }>;
 }
 
+export type ChatMessage = {
+  id: string;
+  sender: 'owner' | 'pet';
+  text: string;
+  createdAt: string;
+};
+
+export async function fetchChatMessages(ownerId: string, profileId: string): Promise<ChatMessage[]> {
+  const r = await fetch(`${API_BASE_URL}/chat/messages?ownerId=${encodeURIComponent(ownerId)}&profileId=${encodeURIComponent(profileId)}`);
+  if (!r.ok) throw new Error('messages_failed');
+  const data = await r.json();
+  return data.messages as ChatMessage[];
+}
+
+export async function sendChatMessage(ownerId: string, profileId: string, text: string): Promise<ChatMessage[]> {
+  const r = await fetch(`${API_BASE_URL}/chat/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ownerId, profileId, text }),
+  });
+  if (!r.ok) throw new Error('send_failed');
+  const data = await r.json();
+  return data.messages as ChatMessage[];
+}
+
 export { API_BASE_URL };
