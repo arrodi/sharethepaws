@@ -12,9 +12,30 @@ type Props = {
 export function DiscoverScreen({ profiles, onReject, onConnect }: Props) {
   const [index, setIndex] = useState(0);
 
-  const profile = useMemo(() => (profiles.length ? profiles[index % profiles.length] : null), [index, profiles]);
+  const profile = useMemo(
+    () => (profiles.length ? profiles[index % profiles.length] : null),
+    [index, profiles]
+  );
 
   const goNext = () => setIndex((v) => v + 1);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy),
+        onPanResponderRelease: (_, g) => {
+          if (!profile) return;
+          if (g.dx > 50) {
+            const moved = onReject(profile);
+            if (moved) goNext();
+          } else if (g.dx < -50) {
+            const moved = onConnect(profile);
+            if (moved) goNext();
+          }
+        },
+      }),
+    [profile, onReject, onConnect]
+  );
 
   if (!profile) {
     return (
@@ -24,23 +45,6 @@ export function DiscoverScreen({ profiles, onReject, onConnect }: Props) {
       </View>
     );
   }
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy),
-        onPanResponderRelease: (_, g) => {
-          if (g.dx > 50) {
-            onReject(profile);
-            goNext();
-          } else if (g.dx < -50) {
-            const moved = onConnect(profile);
-            if (moved) goNext();
-          }
-        },
-      }),
-    [profile, onReject, onConnect]
-  );
 
   return (
     <View style={styles.wrap}>
