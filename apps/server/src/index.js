@@ -97,6 +97,8 @@ async function init() {
     );
   `);
 
+  await pg.query('ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;');
+
   await pg.query(`
     CREATE TABLE IF NOT EXISTS owner_profiles (
       owner_id TEXT PRIMARY KEY,
