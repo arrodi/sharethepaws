@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Image, PanResponder, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Animated, Image, PanResponder, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PetDatingProfile } from '../mock/profiles';
 import { theme } from '../theme';
 
@@ -11,6 +11,7 @@ type Props = {
 
 export function DiscoverScreen({ profiles, onReject, onConnect }: Props) {
   const [index, setIndex] = useState(0);
+  const drag = useRef(new Animated.ValueXY()).current;
 
   const profile = useMemo(
     () => (profiles.length ? profiles[index % profiles.length] : null),
@@ -19,23 +20,54 @@ export function DiscoverScreen({ profiles, onReject, onConnect }: Props) {
 
   const goNext = () => setIndex((v) => v + 1);
 
+  const resetCard = () => {
+    Animated.spring(drag, {
+      toValue: { x: 0, y: 0 },
+      useNativeDriver: true,
+      friction: 7,
+      tension: 70,
+    }).start();
+  };
+
+  const swipeOut = (direction: 'left' | 'right', onDone: () => void) => {
+    Animated.timing(drag, {
+      toValue: { x: direction === 'left' ? -420 : 420, y: 0 },
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      drag.setValue({ x: 0, y: 0 });
+      onDone();
+    });
+  };
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy),
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+        onPanResponderMove: Animated.event([null, { dx: drag.x, dy: drag.y }], { useNativeDriver: false }),
         onPanResponderRelease: (_, g) => {
           if (!profile) return;
-          if (g.dx > 50) {
+          if (g.dx > 90) {
             const moved = onReject(profile);
-            if (moved) goNext();
-          } else if (g.dx < -50) {
+            if (moved) swipeOut('right', goNext);
+            else resetCard();
+          } else if (g.dx < -90) {
             const moved = onConnect(profile);
-            if (moved) goNext();
+            if (moved) swipeOut('left', goNext);
+            else resetCard();
+          } else {
+            resetCard();
           }
         },
       }),
-    [profile, onReject, onConnect]
+    [drag.x, drag.y, profile, onReject, onConnect]
   );
+
+  const rotate = drag.x.interpolate({
+    inputRange: [-220, 0, 220],
+    outputRange: ['-10deg', '0deg', '10deg'],
+    extrapolate: 'clamp',
+  });
 
   if (!profile) {
     return (
@@ -51,7 +83,10 @@ export function DiscoverScreen({ profiles, onReject, onConnect }: Props) {
       <Text style={styles.title}>Discover</Text>
       <Text style={styles.hint}>Swipe right to pass • Swipe left to connect</Text>
 
-      <View style={styles.card} {...panResponder.panHandlers}>
+      <Animated.View
+        style={[styles.card, { transform: [{ translateX: drag.x }, { translateY: drag.y }, { rotate }] }]}
+        {...panResponder.panHandlers}
+      >
         <ScrollView contentContainerStyle={styles.cardScroll} showsVerticalScrollIndicator={false}>
           {profile.photos.map((p, i) => (
             <Image key={`${profile.id}-photo-${i}`} source={{ uri: p }} style={styles.photo} />
@@ -70,7 +105,7 @@ export function DiscoverScreen({ profiles, onReject, onConnect }: Props) {
             </View>
           ))}
         </ScrollView>
-      </View>
+      </Animated.View>
     </View>
   );
 }
