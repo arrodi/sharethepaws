@@ -1,16 +1,17 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import { fetchChats, fetchDiscoverProfiles, mockLogin, swipe, type ChatEntry } from './src/api/client';
+import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { fetchChats, fetchDiscoverProfiles, generateFakeProfiles, mockLogin, resetFakeProfiles, swipe, type ChatEntry } from './src/api/client';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { PetDatingProfile } from './src/mock/profiles';
 import { MatchesScreen } from './src/screens/MatchesScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { theme } from './src/theme';
 
-type Tab = 'auth' | 'onboarding' | 'discover' | 'matches' | 'chat';
+type Tab = 'auth' | 'onboarding' | 'discover' | 'matches' | 'chat' | 'settings';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('discover');
@@ -21,8 +22,13 @@ export default function App() {
   const [profiles, setProfiles] = useState<PetDatingProfile[]>([]);
   const [authWallOpen, setAuthWallOpen] = useState(false);
 
+  const refreshDiscover = async () => {
+    const list = await fetchDiscoverProfiles().catch(() => []);
+    setProfiles(list);
+  };
+
   useEffect(() => {
-    fetchDiscoverProfiles().then(setProfiles).catch(() => setProfiles([]));
+    refreshDiscover();
   }, []);
 
   const refreshChats = async (id: string) => {
@@ -74,6 +80,27 @@ export default function App() {
     }
   };
 
+  const handleGenerateFakeProfiles = async () => {
+    try {
+      const res = await generateFakeProfiles();
+      await refreshDiscover();
+      Alert.alert('Done', `Generated ${res.generated} fake profiles.`);
+    } catch {
+      Alert.alert('Error', 'Could not generate fake profiles. Check local server and infra.');
+    }
+  };
+
+  const handleResetFakeProfiles = async () => {
+    try {
+      await resetFakeProfiles();
+      await refreshDiscover();
+      setChats([]);
+      Alert.alert('Done', 'Generated profiles were reset.');
+    } catch {
+      Alert.alert('Error', 'Could not reset generated profiles.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
@@ -83,6 +110,7 @@ export default function App() {
         {tab === 'discover' ? <DiscoverScreen profiles={profiles} onReject={handleRejectFromDiscover} onConnect={handleConnectFromDiscover} /> : null}
         {tab === 'matches' ? <MatchesScreen /> : null}
         {tab === 'chat' ? <ChatScreen chats={chats} /> : null}
+        {tab === 'settings' ? <SettingsScreen onGenerateFakeProfiles={handleGenerateFakeProfiles} onResetFakeProfiles={handleResetFakeProfiles} /> : null}
       </View>
 
       {authWallOpen ? (
@@ -109,6 +137,7 @@ export default function App() {
           ['discover', 'Discover'],
           ['matches', 'Matches'],
           ['chat', 'Chat'],
+          ['settings', 'Settings'],
         ] as [Exclude<Tab, 'auth'>, string][]).map(([key, label]) => (
           <Pressable key={key} style={styles.tab} onPress={() => setTab(key)}>
             <View style={[styles.dot, tab === key && styles.dotActive]} />

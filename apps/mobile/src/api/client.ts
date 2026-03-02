@@ -38,5 +38,17 @@ export async function fetchChats(ownerId: string): Promise<ChatEntry[]> {
   return data.chats as ChatEntry[];
 }
 
+export async function generateFakeProfiles() {
+  const r = await fetch(`${API_BASE_URL}/admin/generate-fake-profiles`, { method: 'POST' });
+  if (!r.ok) throw new Error('generate_failed');
+  return r.json() as Promise<{ ok: boolean; generated: number }>;
+}
+
+export async function resetFakeProfiles() {
+  const r = await fetch(`${API_BASE_URL}/admin/reset-fake-profiles`, { method: 'POST' });
+  if (!r.ok) throw new Error('reset_failed');
+  return r.json() as Promise<{ ok: boolean }>;
+}
+
 export type { ChatEntry };
 export { API_BASE_URL };
