@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ChatEntry, ChatMessage, fetchChatMessages, sendChatMessage } from '../api/client';
 import { theme } from '../theme';
 
@@ -21,10 +21,13 @@ export function ChatScreen({ chats, ownerId }: Props) {
 
   const send = async () => {
     if (!activeProfileId || !text.trim()) return;
-    const list = await sendChatMessage(ownerId, activeProfileId, text.trim()).catch(() => null);
-    if (list) {
+    try {
+      const list = await sendChatMessage(ownerId, activeProfileId, text.trim());
       setMessages(list);
       setText('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send message';
+      Alert.alert('Send failed', message);
     }
   };
 
@@ -54,6 +57,8 @@ export function ChatScreen({ chats, ownerId }: Props) {
             placeholder="Type a message"
             placeholderTextColor={theme.colors.textSubtle}
             style={styles.input}
+            returnKeyType="send"
+            onSubmitEditing={send}
           />
           <Pressable style={styles.sendBtn} onPress={send}>
             <Text style={styles.sendText}>Send</Text>

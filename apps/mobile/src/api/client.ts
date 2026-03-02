@@ -73,7 +73,10 @@ export async function sendChatMessage(ownerId: string, profileId: string, text: 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ownerId, profileId, text }),
   });
-  if (!r.ok) throw new Error('send_failed');
+  if (!r.ok) {
+    const body = await r.text().catch(() => 'send_failed');
+    throw new Error(body || 'send_failed');
+  }
   const data = await r.json();
   return data.messages as ChatMessage[];
 }
