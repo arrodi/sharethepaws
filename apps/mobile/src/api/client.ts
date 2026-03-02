@@ -40,7 +40,10 @@ export async function fetchChats(ownerId: string): Promise<ChatEntry[]> {
 
 export async function generateFakeProfiles() {
   const r = await fetch(`${API_BASE_URL}/admin/generate-fake-profiles`, { method: 'POST' });
-  if (!r.ok) throw new Error('generate_failed');
+  if (!r.ok) {
+    const text = await r.text().catch(() => 'generate_failed');
+    throw new Error(text || 'generate_failed');
+  }
   return r.json() as Promise<{ ok: boolean; generated: number }>;
 }
 

@@ -85,8 +85,9 @@ export default function App() {
       const res = await generateFakeProfiles();
       await refreshDiscover();
       Alert.alert('Done', `Generated ${res.generated} fake profiles.`);
-    } catch {
-      Alert.alert('Error', 'Could not generate fake profiles. Check local server and infra.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not generate fake profiles. Check local server and infra.';
+      Alert.alert('Error', message);
     }
   };
 
