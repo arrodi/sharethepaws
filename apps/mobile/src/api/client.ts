@@ -53,6 +53,38 @@ export async function resetFakeProfiles() {
   return r.json() as Promise<{ ok: boolean }>;
 }
 
+export type OwnerProfile = {
+  displayName: string;
+  species: string;
+  breed?: string;
+  ageLabel?: string;
+  city?: string;
+  bio?: string;
+  preferredSpecies?: string;
+  maxDistanceKm?: number;
+};
+
+export async function fetchOwnerProfile(ownerId: string): Promise<OwnerProfile | null> {
+  const r = await fetch(`${API_BASE_URL}/me/profile?ownerId=${encodeURIComponent(ownerId)}`);
+  if (!r.ok) throw new Error('profile_fetch_failed');
+  const data = await r.json();
+  return (data.profile ?? null) as OwnerProfile | null;
+}
+
+export async function saveOwnerProfile(ownerId: string, profile: OwnerProfile): Promise<OwnerProfile> {
+  const r = await fetch(`${API_BASE_URL}/me/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ownerId, ...profile }),
+  });
+  if (!r.ok) {
+    const text = await r.text().catch(() => 'profile_save_failed');
+    throw new Error(text || 'profile_save_failed');
+  }
+  const data = await r.json();
+  return data.profile as OwnerProfile;
+}
+
 export type ChatMessage = {
   id: string;
   sender: 'owner' | 'pet';

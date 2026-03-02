@@ -82,6 +82,21 @@ async function init() {
     );
   `);
 
+  await pg.query(`
+    CREATE TABLE IF NOT EXISTS owner_profiles (
+      owner_id TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      species TEXT NOT NULL,
+      breed TEXT,
+      age_label TEXT,
+      city TEXT,
+      bio TEXT,
+      preferred_species TEXT,
+      max_distance_km INTEGER,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
   await ensureBucket();
 }
 
@@ -121,6 +136,7 @@ async function clearGeneratedData() {
   await clearProfileObjectsFromMinio();
   await pg.query('DELETE FROM chat_messages;');
   await pg.query('DELETE FROM chats;');
+  await pg.query('DELETE FROM owner_profiles;');
   await pg.query('DELETE FROM fake_accounts;');
   await pg.query('DELETE FROM discover_profiles;');
 }
@@ -209,6 +225,63 @@ app.post('/auth/mock-login', async (_req, res) => {
   const token = `local-${Date.now()}`;
   await redis.set(`session:${token}`, OWNER_ID, { EX: 60 * 60 * 24 * 7 });
   res.json({ token, ownerId: OWNER_ID });
+});
+
+app.get('/me/profile', async (req, res) => {
+  const ownerId = String(req.query.ownerId || OWNER_ID);
+  const { rows } = await pg.query(
+    `SELECT display_name as "displayName", species, breed, age_label as "ageLabel", city, bio,
+            preferred_species as "preferredSpecies", max_distance_km as "maxDistanceKm"
+     FROM owner_profiles
+     WHERE owner_id = $1
+     LIMIT 1`,
+    [ownerId]
+  );
+  res.json({ profile: rows[0] ?? null });
+});
+
+app.post('/me/profile', async (req, res) => {
+  const {
+    ownerId = OWNER_ID,
+    displayName,
+    species,
+    breed = null,
+    ageLabel = null,
+    city = null,
+    bio = null,
+    preferredSpecies = null,
+    maxDistanceKm = null,
+  } = req.body || {};
+
+  if (!String(displayName || '').trim() || !String(species || '').trim()) {
+    return res.status(400).json({ error: 'display_name_and_species_required' });
+  }
+
+  await pg.query(
+    `INSERT INTO owner_profiles (owner_id, display_name, species, breed, age_label, city, bio, preferred_species, max_distance_km, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+     ON CONFLICT (owner_id) DO UPDATE
+     SET display_name = EXCLUDED.display_name,
+         species = EXCLUDED.species,
+         breed = EXCLUDED.breed,
+         age_label = EXCLUDED.age_label,
+         city = EXCLUDED.city,
+         bio = EXCLUDED.bio,
+         preferred_species = EXCLUDED.preferred_species,
+         max_distance_km = EXCLUDED.max_distance_km,
+         updated_at = NOW()`,
+    [ownerId, String(displayName).trim(), String(species).trim(), breed, ageLabel, city, bio, preferredSpecies, maxDistanceKm]
+  );
+
+  const { rows } = await pg.query(
+    `SELECT display_name as "displayName", species, breed, age_label as "ageLabel", city, bio,
+            preferred_species as "preferredSpecies", max_distance_km as "maxDistanceKm"
+     FROM owner_profiles
+     WHERE owner_id = $1
+     LIMIT 1`,
+    [ownerId]
+  );
+  res.json({ profile: rows[0] ?? null });
 });
 
 app.post('/admin/generate-fake-profiles', async (_req, res) => {

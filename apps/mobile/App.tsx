@@ -1,12 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import { fetchChats, fetchDiscoverProfiles, generateFakeProfiles, mockLogin, resetFakeProfiles, swipe, type ChatEntry } from './src/api/client';
+import { fetchChats, fetchDiscoverProfiles, fetchOwnerProfile, generateFakeProfiles, mockLogin, resetFakeProfiles, saveOwnerProfile, swipe, type ChatEntry, type OwnerProfile } from './src/api/client';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { PetDatingProfile } from './src/mock/profiles';
-import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { theme } from './src/theme';
 
@@ -20,6 +20,7 @@ export default function App() {
   const [chats, setChats] = useState<ChatEntry[]>([]);
   const [profiles, setProfiles] = useState<PetDatingProfile[]>([]);
   const [authWallOpen, setAuthWallOpen] = useState(false);
+  const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
 
   const refreshDiscover = async () => {
     const list = await fetchDiscoverProfiles().catch(() => []);
@@ -29,6 +30,15 @@ export default function App() {
   useEffect(() => {
     refreshDiscover();
   }, []);
+
+  const refreshOwnerProfile = async (id: string) => {
+    const profile = await fetchOwnerProfile(id).catch(() => null);
+    setOwnerProfile(profile);
+  };
+
+  useEffect(() => {
+    refreshOwnerProfile(ownerId);
+  }, [ownerId]);
 
   const refreshChats = async (id: string) => {
     const list = await fetchChats(id).catch(() => []);
@@ -99,12 +109,23 @@ export default function App() {
     }
   };
 
+  const handleSaveOwnerProfile = async (profile: OwnerProfile) => {
+    try {
+      const saved = await saveOwnerProfile(ownerId, profile);
+      setOwnerProfile(saved);
+      Alert.alert('Saved', 'Profile updated.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not save profile';
+      Alert.alert('Error', message);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.content}>
         {tab === 'auth' ? <AuthScreen onContinue={handleAuthContinue} /> : null}
-        {tab === 'onboarding' ? <OnboardingScreen /> : null}
+        {tab === 'onboarding' ? <ProfileScreen profile={ownerProfile} onSave={handleSaveOwnerProfile} /> : null}
         {tab === 'discover' ? <DiscoverScreen profiles={profiles} onReject={handleRejectFromDiscover} onConnect={handleConnectFromDiscover} /> : null}
         {tab === 'chat' ? <ChatScreen chats={chats} ownerId={ownerId} /> : null}
         {tab === 'settings' ? <SettingsScreen onGenerateFakeProfiles={handleGenerateFakeProfiles} onResetFakeProfiles={handleResetFakeProfiles} /> : null}
