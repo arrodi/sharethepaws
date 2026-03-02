@@ -6,12 +6,11 @@ import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { PetDatingProfile } from './src/mock/profiles';
-import { MatchesScreen } from './src/screens/MatchesScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { theme } from './src/theme';
 
-type Tab = 'auth' | 'onboarding' | 'discover' | 'matches' | 'chat' | 'settings';
+type Tab = 'auth' | 'onboarding' | 'discover' | 'chat' | 'settings';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('discover');
@@ -107,7 +106,6 @@ export default function App() {
         {tab === 'auth' ? <AuthScreen onContinue={handleAuthContinue} /> : null}
         {tab === 'onboarding' ? <OnboardingScreen /> : null}
         {tab === 'discover' ? <DiscoverScreen profiles={profiles} onReject={handleRejectFromDiscover} onConnect={handleConnectFromDiscover} /> : null}
-        {tab === 'matches' ? <MatchesScreen chats={chats} /> : null}
         {tab === 'chat' ? <ChatScreen chats={chats} ownerId={ownerId} /> : null}
         {tab === 'settings' ? <SettingsScreen onGenerateFakeProfiles={handleGenerateFakeProfiles} onResetFakeProfiles={handleResetFakeProfiles} /> : null}
       </View>
@@ -134,8 +132,7 @@ export default function App() {
         {([
           ['onboarding', 'Profile'],
           ['discover', 'Discover'],
-          ['matches', 'Matches'],
-          ['chat', 'Chat'],
+          ['chat', 'Matches'],
           ['settings', 'Settings'],
         ] as [Exclude<Tab, 'auth'>, string][]).map(([key, label]) => (
           <Pressable key={key} style={styles.tab} onPress={() => setTab(key)}>
