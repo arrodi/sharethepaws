@@ -94,6 +94,12 @@ export default function App() {
   };
 
   const handleGenerateFakeProfiles = async () => {
+    if (!isLoggedIn) {
+      Alert.alert('Login required', 'Please login first to generate profiles.');
+      setTab('auth');
+      return;
+    }
+
     try {
       const res = await generateFakeProfiles();
       await refreshDiscover();
@@ -105,6 +111,12 @@ export default function App() {
   };
 
   const handleResetFakeProfiles = async () => {
+    if (!isLoggedIn) {
+      Alert.alert('Login required', 'Please login first to reset profiles.');
+      setTab('auth');
+      return;
+    }
+
     try {
       await resetFakeProfiles();
       await refreshDiscover();
